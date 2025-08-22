@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { useProjects } from '../contexts/ProjectContext';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function Projects() {
-  const { projects, deleteProject, updateProject } = useProjects();
+  const { projects, deleteProject, updateProject, isLoading } = useProjects();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -22,24 +22,53 @@ export default function Projects() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleDeleteProject = (id: string, name: string) => {
+  const handleDeleteProject = async (id: number, name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
-      deleteProject(id);
-      toast({
-        title: 'Project deleted',
-        description: `"${name}" has been deleted successfully.`,
-      });
+      try {
+        await deleteProject(id);
+      } catch (error) {
+        console.error('Failed to delete project:', error);
+      }
     }
   };
 
-  const toggleProjectStatus = (id: string, currentStatus: string) => {
+  const toggleProjectStatus = async (id: number, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    updateProject(id, { status: newStatus });
-    toast({
-      title: 'Project updated',
-      description: `Project status changed to ${newStatus}.`,
-    });
+    try {
+      await updateProject(id, { status: newStatus });
+    } catch (error) {
+      console.error('Failed to update project status:', error);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projects</h1>
+            <p className="text-gray-600 dark:text-gray-400">Loading projects...</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

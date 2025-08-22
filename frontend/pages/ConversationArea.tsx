@@ -10,16 +10,23 @@ import { Badge } from '@/components/ui/badge';
 import { useProjects } from '../contexts/ProjectContext';
 import { useConversations } from '../contexts/ConversationContext';
 import { useToast } from '@/components/ui/use-toast';
-import { LeadContext, Message } from '../types/conversation';
+import type { CreateConversationRequest, MessageResponse } from '~backend/conversations/types';
+
+interface LeadContext {
+  name: string;
+  company: string;
+  source: string;
+  notes: string;
+}
 
 export default function ConversationArea() {
   const { projects } = useProjects();
-  const { createConversation, addMessage } = useConversations();
+  const { createConversation, addMessage, updateConversation } = useConversations();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [selectedProjectId, setSelectedProjectId] = useState('');
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   const [leadContext, setLeadContext] = useState<LeadContext>({
     name: '',
     company: '',
@@ -27,11 +34,11 @@ export default function ConversationArea() {
     notes: '',
   });
   const [userInput, setUserInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const activeProjects = projects.filter(p => p.status === 'active');
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const selectedProject = projects.find(p => p.id === Number(selectedProjectId));
 
   useEffect(() => {
     scrollToBottom();
@@ -41,7 +48,7 @@ export default function ConversationArea() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleStartConversation = () => {
+  const handleStartConversation = async () => {
     if (!selectedProjectId || !leadContext.name || !leadContext.company) {
       toast({
         title: 'Missing information',
@@ -51,18 +58,26 @@ export default function ConversationArea() {
       return;
     }
 
-    const conversationId = createConversation({
-      projectId: selectedProjectId,
-      leadContext,
-    });
+    try {
+      const conversationData: CreateConversationRequest = {
+        projectId: Number(selectedProjectId),
+        leadName: leadContext.name,
+        leadCompany: leadContext.company,
+        leadSource: leadContext.source || undefined,
+        leadNotes: leadContext.notes || undefined,
+      };
 
-    setCurrentConversationId(conversationId);
-    setMessages([]);
-    
-    toast({
-      title: 'Conversation started',
-      description: `New conversation with ${leadContext.name} from ${leadContext.company}`,
-    });
+      const conversationId = await createConversation(conversationData);
+      setCurrentConversationId(conversationId);
+      setMessages([]);
+      
+      toast({
+        title: 'Conversation started',
+        description: `New conversation with ${leadContext.name} from ${leadContext.company}`,
+      });
+    } catch (error) {
+      console.error('Failed to start conversation:', error);
+    }
   };
 
   const generateAISuggestions = async (userMessage: string): Promise<string> => {
@@ -88,42 +103,33 @@ export default function ConversationArea() {
   const handleSendMessage = async () => {
     if (!userInput.trim() || !currentConversationId) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: userInput.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    addMessage(currentConversationId, {
-      type: 'user',
-      content: userInput.trim(),
-    });
-
-    const currentInput = userInput;
-    setUserInput('');
-    setIsGenerating(true);
-
     try {
+      // Add user message
+      const userMessage = await addMessage(currentConversationId, {
+        type: 'user',
+        content: userInput.trim(),
+      });
+
+      setMessages(prev => [...prev, userMessage]);
+
+      const currentInput = userInput;
+      setUserInput('');
+      setIsGenerating(true);
+
+      // Generate AI response
       const aiSuggestion = await generateAISuggestions(currentInput);
       
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        content: aiSuggestion,
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-      addMessage(currentConversationId, {
+      const aiMessage = await addMessage(currentConversationId, {
         type: 'ai',
         content: aiSuggestion,
       });
+
+      setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
+      console.error('Failed to send message:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate AI suggestions. Please try again.',
+        description: 'Failed to send message. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -155,13 +161,17 @@ export default function ConversationArea() {
     }
   };
 
-  const handleMarkAsClosed = () => {
+  const handleMarkAsClosed = async () => {
     if (currentConversationId) {
-      // This would typically update the conversation status
-      toast({
-        title: 'Conversation closed',
-        description: 'The conversation has been marked as closed.',
-      });
+      try {
+        await updateConversation(currentConversationId, { status: 'closed' });
+        toast({
+          title: 'Conversation closed',
+          description: 'The conversation has been marked as closed.',
+        });
+      } catch (error) {
+        console.error('Failed to close conversation:', error);
+      }
     }
   };
 
@@ -198,7 +208,7 @@ export default function ConversationArea() {
                 </SelectTrigger>
                 <SelectContent>
                   {activeProjects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
+                    <SelectItem key={project.id} value={project.id.toString()}>
                       {project.name}
                     </SelectItem>
                   ))}
@@ -359,7 +369,7 @@ export default function ConversationArea() {
                                 ? 'text-blue-100' 
                                 : 'text-gray-500 dark:text-gray-400'
                             }`}>
-                              {message.timestamp.toLocaleTimeString()}
+                              {new Date(message.timestamp).toLocaleTimeString()}
                             </p>
                           </div>
                           {message.type === 'ai' && (

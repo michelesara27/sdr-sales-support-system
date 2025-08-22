@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, Eye, Download, Calendar, User, Building } from 'lucide-react';
+import { Search, Filter, Eye, Download, Calendar, User, Building, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,27 +9,27 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useConversations } from '../contexts/ConversationContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { useToast } from '@/components/ui/use-toast';
-import { Conversation } from '../types/conversation';
+import type { ConversationResponse } from '~backend/conversations/types';
 
 export default function Conversations() {
-  const { conversations } = useConversations();
+  const { conversations, isLoading } = useConversations();
   const { projects } = useProjects();
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<ConversationResponse | null>(null);
 
   const filteredConversations = conversations.filter(conversation => {
     const project = projects.find(p => p.id === conversation.projectId);
     const matchesSearch = 
-      conversation.leadContext.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      conversation.leadContext.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      conversation.leadName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      conversation.leadCompany.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project?.name.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || conversation.status === statusFilter;
-    const matchesProject = projectFilter === 'all' || conversation.projectId === projectFilter;
+    const matchesProject = projectFilter === 'all' || conversation.projectId === Number(projectFilter);
     
     return matchesSearch && matchesStatus && matchesProject;
   });
@@ -38,11 +38,11 @@ export default function Conversations() {
     const csvData = filteredConversations.map(conversation => {
       const project = projects.find(p => p.id === conversation.projectId);
       return {
-        'Lead Name': conversation.leadContext.name,
-        'Company': conversation.leadContext.company,
+        'Lead Name': conversation.leadName,
+        'Company': conversation.leadCompany,
         'Project': project?.name || 'Unknown',
         'Status': conversation.status,
-        'Source': conversation.leadContext.source,
+        'Source': conversation.leadSource || '',
         'Messages': conversation.messages.length,
         'Created': new Date(conversation.createdAt).toLocaleDateString(),
         'Updated': new Date(conversation.updatedAt).toLocaleDateString(),
@@ -68,6 +68,32 @@ export default function Conversations() {
       description: 'Conversations have been exported to CSV.',
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Conversations</h1>
+            <p className="text-gray-600 dark:text-gray-400">Loading conversations...</p>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -116,7 +142,7 @@ export default function Conversations() {
           <SelectContent>
             <SelectItem value="all">All Projects</SelectItem>
             {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
+              <SelectItem key={project.id} value={project.id.toString()}>
                 {project.name}
               </SelectItem>
             ))}
@@ -138,13 +164,13 @@ export default function Conversations() {
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-gray-500" />
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {conversation.leadContext.name}
+                            {conversation.leadName}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Building className="h-4 w-4 text-gray-500" />
                           <span className="text-gray-600 dark:text-gray-400">
-                            {conversation.leadContext.company}
+                            {conversation.leadCompany}
                           </span>
                         </div>
                         <Badge 
@@ -157,8 +183,8 @@ export default function Conversations() {
                       <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
                         <span>Project: {project?.name || 'Unknown'}</span>
                         <span>Messages: {conversation.messages.length}</span>
-                        {conversation.leadContext.source && (
-                          <span>Source: {conversation.leadContext.source}</span>
+                        {conversation.leadSource && (
+                          <span>Source: {conversation.leadSource}</span>
                         )}
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
@@ -166,9 +192,9 @@ export default function Conversations() {
                         </div>
                       </div>
 
-                      {conversation.leadContext.notes && (
+                      {conversation.leadNotes && (
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
-                          {conversation.leadContext.notes}
+                          {conversation.leadNotes}
                         </p>
                       )}
                     </div>
@@ -187,10 +213,10 @@ export default function Conversations() {
                       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>
-                            Conversation with {conversation.leadContext.name}
+                            Conversation with {conversation.leadName}
                           </DialogTitle>
                           <DialogDescription>
-                            {conversation.leadContext.company} • {project?.name || 'Unknown Project'}
+                            {conversation.leadCompany} • {project?.name || 'Unknown Project'}
                           </DialogDescription>
                         </DialogHeader>
                         
@@ -199,15 +225,15 @@ export default function Conversations() {
                           <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <div>
                               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lead Name</p>
-                              <p className="text-gray-900 dark:text-white">{conversation.leadContext.name}</p>
+                              <p className="text-gray-900 dark:text-white">{conversation.leadName}</p>
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Company</p>
-                              <p className="text-gray-900 dark:text-white">{conversation.leadContext.company}</p>
+                              <p className="text-gray-900 dark:text-white">{conversation.leadCompany}</p>
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Source</p>
-                              <p className="text-gray-900 dark:text-white">{conversation.leadContext.source || 'Not specified'}</p>
+                              <p className="text-gray-900 dark:text-white">{conversation.leadSource || 'Not specified'}</p>
                             </div>
                             <div>
                               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</p>
@@ -215,10 +241,10 @@ export default function Conversations() {
                                 {conversation.status}
                               </Badge>
                             </div>
-                            {conversation.leadContext.notes && (
+                            {conversation.leadNotes && (
                               <div className="col-span-2">
                                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Notes</p>
-                                <p className="text-gray-900 dark:text-white">{conversation.leadContext.notes}</p>
+                                <p className="text-gray-900 dark:text-white">{conversation.leadNotes}</p>
                               </div>
                             )}
                           </div>

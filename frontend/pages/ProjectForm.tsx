@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useProjects } from '../contexts/ProjectContext';
 import { useToast } from '@/components/ui/use-toast';
-import { CreateProjectData } from '../types/project';
+import type { CreateProjectRequest, UpdateProjectRequest } from '~backend/projects/types';
 
 export default function ProjectForm() {
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ export default function ProjectForm() {
   const { toast } = useToast();
   const isEditing = Boolean(id);
 
-  const [formData, setFormData] = useState<CreateProjectData>({
+  const [formData, setFormData] = useState<CreateProjectRequest>({
     name: '',
     description: '',
     productDetails: '',
@@ -34,7 +34,7 @@ export default function ProjectForm() {
 
   useEffect(() => {
     if (isEditing && id) {
-      const project = getProject(id);
+      const project = getProject(Number(id));
       if (project) {
         setFormData({
           name: project.name,
@@ -98,31 +98,20 @@ export default function ProjectForm() {
 
     try {
       if (isEditing && id) {
-        updateProject(id, formData);
-        toast({
-          title: 'Project updated',
-          description: 'Your project has been updated successfully.',
-        });
+        const updateData: UpdateProjectRequest = formData;
+        await updateProject(Number(id), updateData);
       } else {
-        createProject(formData);
-        toast({
-          title: 'Project created',
-          description: 'Your new project has been created successfully.',
-        });
+        await createProject(formData);
       }
       navigate('/projects');
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Something went wrong. Please try again.',
-        variant: 'destructive',
-      });
+      console.error('Form submission error:', error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleInputChange = (field: keyof CreateProjectData, value: string) => {
+  const handleInputChange = (field: keyof CreateProjectRequest, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));

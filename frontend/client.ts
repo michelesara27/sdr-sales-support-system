@@ -33,6 +33,9 @@ const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
  * Client is an API client for the  Encore application.
  */
 export class Client {
+    public readonly analytics: analytics.ServiceClient
+    public readonly conversations: conversations.ServiceClient
+    public readonly projects: projects.ServiceClient
     private readonly options: ClientOptions
     private readonly target: string
 
@@ -47,6 +50,9 @@ export class Client {
         this.target = target
         this.options = options ?? {}
         const base = new BaseClient(this.target, this.options)
+        this.analytics = new analytics.ServiceClient(base)
+        this.conversations = new conversations.ServiceClient(base)
+        this.projects = new projects.ServiceClient(base)
     }
 
     /**
@@ -75,6 +81,250 @@ export interface ClientOptions {
 
     /** Default RequestInit to be used for the client */
     requestInit?: Omit<RequestInit, "headers"> & { headers?: Record<string, string> }
+}
+
+/**
+ * Import the endpoint handlers to derive the types for the client.
+ */
+import { getConversationDetails as api_analytics_conversation_details_getConversationDetails } from "~backend/analytics/conversation_details";
+import { getDashboard as api_analytics_dashboard_getDashboard } from "~backend/analytics/dashboard";
+import { getProjectSummary as api_analytics_project_summary_getProjectSummary } from "~backend/analytics/project_summary";
+import { getRecentActivity as api_analytics_recent_activity_getRecentActivity } from "~backend/analytics/recent_activity";
+
+export namespace analytics {
+
+    export class ServiceClient {
+        private baseClient: BaseClient
+
+        constructor(baseClient: BaseClient) {
+            this.baseClient = baseClient
+            this.getConversationDetails = this.getConversationDetails.bind(this)
+            this.getDashboard = this.getDashboard.bind(this)
+            this.getProjectSummary = this.getProjectSummary.bind(this)
+            this.getRecentActivity = this.getRecentActivity.bind(this)
+        }
+
+        /**
+         * Retrieves conversation details with analytics.
+         */
+        public async getConversationDetails(): Promise<ResponseType<typeof api_analytics_conversation_details_getConversationDetails>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/analytics/conversations`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_analytics_conversation_details_getConversationDetails>
+        }
+
+        /**
+         * Retrieves dashboard statistics.
+         */
+        public async getDashboard(): Promise<ResponseType<typeof api_analytics_dashboard_getDashboard>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/analytics/dashboard`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_analytics_dashboard_getDashboard>
+        }
+
+        /**
+         * Retrieves project summary with analytics.
+         */
+        public async getProjectSummary(): Promise<ResponseType<typeof api_analytics_project_summary_getProjectSummary>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/analytics/projects`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_analytics_project_summary_getProjectSummary>
+        }
+
+        /**
+         * Retrieves recent activity across the system.
+         */
+        public async getRecentActivity(params: RequestType<typeof api_analytics_recent_activity_getRecentActivity>): Promise<ResponseType<typeof api_analytics_recent_activity_getRecentActivity>> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                limit: params.limit === undefined ? undefined : String(params.limit),
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/analytics/recent-activity`, {query, method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_analytics_recent_activity_getRecentActivity>
+        }
+    }
+}
+
+/**
+ * Import the endpoint handlers to derive the types for the client.
+ */
+import { addMessage as api_conversations_add_message_addMessage } from "~backend/conversations/add_message";
+import { create as api_conversations_create_create } from "~backend/conversations/create";
+import { deleteConversation as api_conversations_delete_deleteConversation } from "~backend/conversations/delete";
+import { get as api_conversations_get_get } from "~backend/conversations/get";
+import { list as api_conversations_list_list } from "~backend/conversations/list";
+import { update as api_conversations_update_update } from "~backend/conversations/update";
+
+export namespace conversations {
+
+    export class ServiceClient {
+        private baseClient: BaseClient
+
+        constructor(baseClient: BaseClient) {
+            this.baseClient = baseClient
+            this.addMessage = this.addMessage.bind(this)
+            this.create = this.create.bind(this)
+            this.deleteConversation = this.deleteConversation.bind(this)
+            this.get = this.get.bind(this)
+            this.list = this.list.bind(this)
+            this.update = this.update.bind(this)
+        }
+
+        /**
+         * Adds a message to an existing conversation.
+         */
+        public async addMessage(params: RequestType<typeof api_conversations_add_message_addMessage>): Promise<ResponseType<typeof api_conversations_add_message_addMessage>> {
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                content: params.content,
+                type:    params.type,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.id)}/messages`, {method: "POST", body: JSON.stringify(body)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_add_message_addMessage>
+        }
+
+        /**
+         * Creates a new conversation.
+         */
+        public async create(params: RequestType<typeof api_conversations_create_create>): Promise<ResponseType<typeof api_conversations_create_create>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/conversations`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_create_create>
+        }
+
+        /**
+         * Deletes a conversation and all its messages.
+         */
+        public async deleteConversation(params: { id: number }): Promise<void> {
+            await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.id)}`, {method: "DELETE", body: undefined})
+        }
+
+        /**
+         * Retrieves a specific conversation by ID.
+         */
+        public async get(params: { id: number }): Promise<ResponseType<typeof api_conversations_get_get>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.id)}`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_get_get>
+        }
+
+        /**
+         * Retrieves all conversations with optional filtering.
+         */
+        public async list(params: RequestType<typeof api_conversations_list_list>): Promise<ResponseType<typeof api_conversations_list_list>> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                projectId: params.projectId === undefined ? undefined : String(params.projectId),
+                status:    params.status === undefined ? undefined : String(params.status),
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/conversations`, {query, method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_list_list>
+        }
+
+        /**
+         * Updates an existing conversation.
+         */
+        public async update(params: RequestType<typeof api_conversations_update_update>): Promise<ResponseType<typeof api_conversations_update_update>> {
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                leadCompany: params.leadCompany,
+                leadName:    params.leadName,
+                leadNotes:   params.leadNotes,
+                leadSource:  params.leadSource,
+                status:      params.status,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.id)}`, {method: "PUT", body: JSON.stringify(body)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_update_update>
+        }
+    }
+}
+
+/**
+ * Import the endpoint handlers to derive the types for the client.
+ */
+import { create as api_projects_create_create } from "~backend/projects/create";
+import { deleteProject as api_projects_delete_deleteProject } from "~backend/projects/delete";
+import { get as api_projects_get_get } from "~backend/projects/get";
+import { list as api_projects_list_list } from "~backend/projects/list";
+import { update as api_projects_update_update } from "~backend/projects/update";
+
+export namespace projects {
+
+    export class ServiceClient {
+        private baseClient: BaseClient
+
+        constructor(baseClient: BaseClient) {
+            this.baseClient = baseClient
+            this.create = this.create.bind(this)
+            this.deleteProject = this.deleteProject.bind(this)
+            this.get = this.get.bind(this)
+            this.list = this.list.bind(this)
+            this.update = this.update.bind(this)
+        }
+
+        /**
+         * Creates a new project.
+         */
+        public async create(params: RequestType<typeof api_projects_create_create>): Promise<ResponseType<typeof api_projects_create_create>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/projects`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_projects_create_create>
+        }
+
+        /**
+         * Deletes a project and all its related data.
+         */
+        public async deleteProject(params: { id: number }): Promise<void> {
+            await this.baseClient.callTypedAPI(`/projects/${encodeURIComponent(params.id)}`, {method: "DELETE", body: undefined})
+        }
+
+        /**
+         * Retrieves a specific project by ID.
+         */
+        public async get(params: { id: number }): Promise<ResponseType<typeof api_projects_get_get>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/projects/${encodeURIComponent(params.id)}`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_projects_get_get>
+        }
+
+        /**
+         * Retrieves all projects with their objections.
+         */
+        public async list(): Promise<ResponseType<typeof api_projects_list_list>> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/projects`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_projects_list_list>
+        }
+
+        /**
+         * Updates an existing project.
+         */
+        public async update(params: RequestType<typeof api_projects_update_update>): Promise<ResponseType<typeof api_projects_update_update>> {
+            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
+            const body: Record<string, any> = {
+                approachGuide:  params.approachGuide,
+                description:    params.description,
+                name:           params.name,
+                objections:     params.objections,
+                productDetails: params.productDetails,
+                status:         params.status,
+                targetAudience: params.targetAudience,
+                valueArguments: params.valueArguments,
+            }
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/projects/${encodeURIComponent(params.id)}`, {method: "PUT", body: JSON.stringify(body)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_projects_update_update>
+        }
+    }
 }
 
 

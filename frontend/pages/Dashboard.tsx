@@ -10,16 +10,40 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
+import { useBackend } from '../hooks/useBackend';
 import { useProjects } from '../contexts/ProjectContext';
 import { useConversations } from '../contexts/ConversationContext';
 
 export default function Dashboard() {
+  const backend = useBackend();
   const { projects } = useProjects();
   const { conversations } = useConversations();
 
-  const activeProjects = projects.filter(p => p.status === 'active').length;
-  const openConversations = conversations.filter(c => c.status === 'open').length;
-  const totalConversations = conversations.length;
+  const { data: dashboardData } = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: async () => {
+      try {
+        return await backend.analytics.getDashboard();
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+        throw error;
+      }
+    },
+  });
+
+  const stats = dashboardData?.stats || {
+    totalProjects: 0,
+    activeProjects: 0,
+    totalConversations: 0,
+    openConversations: 0,
+    closedConversations: 0,
+    avgMessagesPerConversation: 0,
+    totalMessages: 0,
+    totalUserMessages: 0,
+    totalAiMessages: 0,
+  };
+
   const recentProjects = projects.slice(0, 3);
   const recentConversations = conversations.slice(0, 3);
 
@@ -57,9 +81,9 @@ export default function Dashboard() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeProjects}</div>
+            <div className="text-2xl font-bold">{stats.activeProjects}</div>
             <p className="text-xs text-muted-foreground">
-              {projects.length} total projects
+              {stats.totalProjects} total projects
             </p>
           </CardContent>
         </Card>
@@ -70,35 +94,35 @@ export default function Dashboard() {
             <MessageCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{openConversations}</div>
+            <div className="text-2xl font-bold">{stats.openConversations}</div>
             <p className="text-xs text-muted-foreground">
-              {totalConversations} total conversations
+              {stats.totalConversations} total conversations
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
+            <CardTitle className="text-sm font-medium">Avg Messages</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24%</div>
+            <div className="text-2xl font-bold">{Math.round(stats.avgMessagesPerConversation)}</div>
             <p className="text-xs text-muted-foreground">
-              +2% from last month
+              per conversation
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Leads</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Messages</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">142</div>
+            <div className="text-2xl font-bold">{stats.totalMessages}</div>
             <p className="text-xs text-muted-foreground">
-              +12 this week
+              {stats.totalUserMessages} user, {stats.totalAiMessages} AI
             </p>
           </CardContent>
         </Card>
@@ -169,10 +193,10 @@ export default function Dashboard() {
                 <div key={conversation.id} className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">
-                      {conversation.leadContext.name}
+                      {conversation.leadName}
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {conversation.leadContext.company}
+                      {conversation.leadCompany}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
