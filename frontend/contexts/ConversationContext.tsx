@@ -32,6 +32,7 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     queryKey: ['conversations'],
     queryFn: async () => {
       try {
+        // Call the list endpoint without any parameters
         return await backend.conversations.list();
       } catch (error) {
         console.error('Failed to fetch conversations:', error);

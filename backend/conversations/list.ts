@@ -11,19 +11,21 @@ interface ListConversationsParams {
 // Retrieves all conversations with optional filtering.
 export const list = api<ListConversationsParams, ConversationListResponse>(
   { expose: true, method: "GET", path: "/conversations" },
-  async (params = {}) => {
-    const { projectId, status } = params;
+  async (params) => {
+    // Ensure params is defined and extract values safely
+    const projectId = params?.projectId;
+    const status = params?.status;
     
     // Build WHERE clause
     const conditions: string[] = [];
     const values: any[] = [];
 
-    if (projectId !== undefined) {
+    if (projectId !== undefined && projectId !== null) {
       conditions.push(`c.project_id = $${values.length + 1}`);
       values.push(projectId);
     }
 
-    if (status !== undefined) {
+    if (status !== undefined && status !== null) {
       conditions.push(`c.status = $${values.length + 1}`);
       values.push(status);
     }
