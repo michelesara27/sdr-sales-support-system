@@ -11,8 +11,8 @@ interface ListConversationsParams {
 // Retrieves all conversations with optional filtering.
 export const list = api<ListConversationsParams, ConversationListResponse>(
   { expose: true, method: "GET", path: "/conversations" },
-  async (params) => {
-    // Ensure params is defined and extract values safely
+  async (params = {}) => {
+    // Safely extract parameters with default empty object
     const projectId = params?.projectId;
     const status = params?.status;
     
