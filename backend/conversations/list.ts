@@ -11,7 +11,9 @@ interface ListConversationsParams {
 // Retrieves all conversations with optional filtering.
 export const list = api<ListConversationsParams, ConversationListResponse>(
   { expose: true, method: "GET", path: "/conversations" },
-  async ({ projectId, status }) => {
+  async (params = {}) => {
+    const { projectId, status } = params;
+    
     // Build WHERE clause
     const conditions: string[] = [];
     const values: any[] = [];
@@ -46,17 +48,26 @@ export const list = api<ListConversationsParams, ConversationListResponse>(
 
     // Get all messages for these conversations
     const conversationIds = conversations.map(c => c.id);
-    const messages = conversationIds.length > 0 ? await sdrDB.queryAll<{
+    let messages: {
       id: number;
       conversation_id: number;
       message_type: string;
       content: string;
       created_at: Date;
-    }>`
-      SELECT * FROM messages 
-      WHERE conversation_id = ANY(${conversationIds})
-      ORDER BY created_at ASC
-    ` : [];
+    }[] = [];
+
+    if (conversationIds.length > 0) {
+      messages = await sdrDB.rawQueryAll<{
+        id: number;
+        conversation_id: number;
+        message_type: string;
+        content: string;
+        created_at: Date;
+      }>(
+        `SELECT * FROM messages WHERE conversation_id = ANY($1) ORDER BY created_at ASC`,
+        conversationIds
+      );
+    }
 
     // Group messages by conversation
     const messagesByConversation = messages.reduce((acc, msg) => {
