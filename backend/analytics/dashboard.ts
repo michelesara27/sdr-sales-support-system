@@ -13,7 +13,7 @@ export const getDashboard = api<void, DashboardResponse>(
         COUNT(DISTINCT c.id) as total_conversations,
         COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
         COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_conversations,
-        COALESCE(AVG(ca.total_messages), 0) as avg_messages_per_conversation,
+        COALESCE(AVG(ca.total_messages)::DOUBLE PRECISION, 0) as avg_messages_per_conversation,
         COUNT(DISTINCT m.id) as total_messages,
         COUNT(DISTINCT CASE WHEN m.message_type = 'user' THEN m.id END) as total_user_messages,
         COUNT(DISTINCT CASE WHEN m.message_type = 'ai' THEN m.id END) as total_ai_messages

@@ -18,7 +18,7 @@ export const getProjectSummary = api<void, ProjectSummaryResponse>(
         COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
         COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_conversations,
         COUNT(DISTINCT o.id) as total_objections,
-        COALESCE(AVG(ca.total_messages), 0) as avg_messages_per_conversation,
+        COALESCE(AVG(ca.total_messages)::DOUBLE PRECISION, 0) as avg_messages_per_conversation,
         MAX(c.updated_at) as last_conversation_activity
       FROM projects p
       LEFT JOIN conversations c ON p.id = c.project_id
