@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../lib/supabase"; // Ajuste o caminho conforme sua estrutura
+import { supabase } from "../lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ const Admin = () => {
   const [activeInvitations, setActiveInvitations] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lastInvitationLink, setLastInvitationLink] = useState(""); // 👈 novo state
 
   useEffect(() => {
     fetchCompanyData();
@@ -44,7 +45,6 @@ const Admin = () => {
       }
 
       if (data) {
-        console.log("Dados da empresa:", data);
         setCompanyData({
           trade_name: data.trade_name || "",
           email: data.email || "",
@@ -104,7 +104,7 @@ const Admin = () => {
       const now = new Date().toISOString();
 
       const { data, error } = await supabase
-        .from("invitation_links")
+        .from("invitations")
         .select(
           `
           *,
@@ -112,7 +112,7 @@ const Admin = () => {
         `
         )
         .gt("expires_at", now)
-        .eq("is_used", false)
+        .eq("used", false)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -130,7 +130,6 @@ const Admin = () => {
 
   const generateInvitationLink = async () => {
     try {
-      // Primeiro, precisamos obter o ID da empresa
       const { data: companyData, error: companyError } = await supabase
         .from("company")
         .select("id")
@@ -143,18 +142,17 @@ const Admin = () => {
         return;
       }
 
-      // Gerar token único
       const token =
         Math.random().toString(36).substring(2) + Date.now().toString(36);
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutos
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-      // Inserir no Supabase
-      const { error } = await supabase.from("invitation_links").insert([
+      const { error } = await supabase.from("invitations").insert([
         {
           company_id: companyData.id,
-          token: token,
+          token,
+          email: null,
           expires_at: expiresAt.toISOString(),
-          is_used: false,
+          used: false,
         },
       ]);
 
@@ -166,91 +164,15 @@ const Admin = () => {
 
       const invitationLink = `${window.location.origin}/register?token=${token}`;
 
-      // Copiar para área de transferência
+      // 👇 guarda no state e copia automaticamente
+      setLastInvitationLink(invitationLink);
       navigator.clipboard.writeText(invitationLink);
-      alert(
-        "✅ Link de convite copiado! Válido por 5 minutos.\n\n" + invitationLink
-      );
+      alert("✅ Link gerado! Também foi copiado automaticamente.");
 
       fetchActiveInvitations();
     } catch (error) {
       console.error("Erro:", error);
       alert("❌ Erro ao gerar link de convite");
-    }
-  };
-
-  const updateCompanyData = async () => {
-    try {
-      if (!companyData.trade_name || !companyData.email) {
-        alert("❌ Nome fantasia e e-mail são obrigatórios");
-        return;
-      }
-
-      // Primeiro, precisamos obter o ID da empresa
-      const { data: existingCompany, error: fetchError } = await supabase
-        .from("company")
-        .select("id")
-        .limit(1)
-        .single();
-
-      let result;
-
-      if (fetchError || !existingCompany) {
-        // Se não existir, criar
-        const { data, error } = await supabase
-          .from("company")
-          .insert([
-            {
-              trade_name: companyData.trade_name,
-              email: companyData.email,
-              phone: companyData.phone,
-              cnpj: companyData.cnpj,
-              address: companyData.address,
-              neighborhood: companyData.neighborhood,
-              zip_code: companyData.zip_code,
-              city: companyData.city,
-              state: companyData.state,
-              password: companyData.password,
-              updated_at: new Date().toISOString(),
-            },
-          ])
-          .select();
-
-        result = { data, error };
-      } else {
-        // Se existir, atualizar
-        const { data, error } = await supabase
-          .from("company")
-          .update({
-            trade_name: companyData.trade_name,
-            email: companyData.email,
-            phone: companyData.phone,
-            cnpj: companyData.cnpj,
-            address: companyData.address,
-            neighborhood: companyData.neighborhood,
-            zip_code: companyData.zip_code,
-            city: companyData.city,
-            state: companyData.state,
-            password: companyData.password,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existingCompany.id)
-          .select();
-
-        result = { data, error };
-      }
-
-      if (result.error) {
-        console.error("Erro ao salvar:", result.error);
-        alert("❌ Erro ao salvar dados da empresa");
-        return;
-      }
-
-      alert("✅ Dados da empresa salvos com sucesso!");
-      setShowEditModal(false);
-    } catch (error) {
-      console.error("Erro:", error);
-      alert("❌ Erro ao salvar dados da empresa");
     }
   };
 
@@ -299,22 +221,38 @@ const Admin = () => {
         <CardHeader>
           <CardTitle>Acesso Rápido</CardTitle>
         </CardHeader>
-        <CardContent className="flex gap-4">
-          <Button
-            className="bg-blue-600 hover:bg-blue-700"
-            onClick={() => setShowEditModal(true)}
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Editar Dados da Empresa
-          </Button>
+        <CardContent className="space-y-4">
+          <div className="flex gap-4">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => setShowEditModal(true)}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Editar Dados da Empresa
+            </Button>
 
-          <Button
-            className="bg-green-600 hover:bg-green-700"
-            onClick={generateInvitationLink}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Gerar Link de Convite
-          </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={generateInvitationLink}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Gerar Link de Convite
+            </Button>
+          </div>
+
+          {/* Mostra o último link gerado */}
+          {lastInvitationLink && (
+            <div className="flex items-center gap-2">
+              <Input value={lastInvitationLink} readOnly className="flex-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyToClipboard(lastInvitationLink)}
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
