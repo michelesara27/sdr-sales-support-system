@@ -1,11 +1,12 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { DatabaseProvider } from './contexts/DatabaseContext';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Projects from './pages/Projects';
-import Conversation from './pages/Conversation';
-import Admin from './pages/Admin';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { DatabaseProvider } from "./contexts/DatabaseContext";
+import Layout from "./components/Layout";
+import Dashboard from "./pages/Dashboard";
+import Projects from "./pages/Projects";
+import Conversation from "./pages/Conversation";
+import Admin from "./pages/Admin";
+import { Toaster } from "react-hot-toast";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           </Routes>
         </Layout>
       </Router>
+      <Toaster position="top-right" />
     </DatabaseProvider>
   );
 }
