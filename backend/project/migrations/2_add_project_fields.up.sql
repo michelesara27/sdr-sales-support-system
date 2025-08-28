@@ -1,0 +1,9 @@
+ALTER TABLE projects ADD COLUMN product_service_name TEXT;
+ALTER TABLE projects ADD COLUMN company_name TEXT;
+ALTER TABLE projects ADD COLUMN ideal_client_profile TEXT;
+ALTER TABLE projects ADD COLUMN product_service_description TEXT;
+ALTER TABLE projects ADD COLUMN segment TEXT;
+ALTER TABLE projects ADD COLUMN problem_solved TEXT;
+ALTER TABLE projects ADD COLUMN value_proposition TEXT;
+ALTER TABLE projects ADD COLUMN competitive_advantages TEXT;
+ALTER TABLE projects ADD COLUMN expected_objections TEXT;

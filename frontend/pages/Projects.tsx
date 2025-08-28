@@ -1,224 +1,241 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Search, Filter, Edit, Trash2, Eye, FolderOpen } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useProjects } from '../contexts/ProjectContext';
-import { useToast } from '@/components/ui/use-toast';
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Search, Edit, Trash2, Building, Package } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
+import backend from "~backend/client";
+import CreateProjectDialog from "../components/CreateProjectDialog";
+import EditProjectDialog from "../components/EditProjectDialog";
+import type { Project } from "~backend/project/create";
 
-export default function Projects() {
-  const { projects, deleteProject, updateProject, isLoading } = useProjects();
+function Projects() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const queryClient = useQueryClient();
 
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const { data: projectsData, isLoading, error } = useQuery({
+    queryKey: ["projects", searchTerm],
+    queryFn: async () => {
+      try {
+        return await backend.project.list({ search: searchTerm || undefined });
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+        throw error;
+      }
+    },
+    retry: 3,
+    retryDelay: 1000,
   });
 
-  const handleDeleteProject = async (id: number, name: string) => {
-    if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (id: number) => {
       try {
-        await deleteProject(id);
+        return await backend.project.deleteProject({ id });
       } catch (error) {
-        console.error('Failed to delete project:', error);
+        console.error("Error deleting project:", error);
+        throw error;
       }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project-stats"] });
+      toast({
+        title: "Projeto excluído",
+        description: "O projeto foi excluído com sucesso.",
+      });
+    },
+    onError: (error) => {
+      console.error("Error deleting project:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o projeto.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteProject = (id: number) => {
+    if (confirm("Tem certeza que deseja excluir este projeto?")) {
+      deleteProjectMutation.mutate(id);
     }
   };
 
-  const toggleProjectStatus = async (id: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    try {
-      await updateProject(id, { status: newStatus });
-    } catch (error) {
-      console.error('Failed to update project status:', error);
-    }
-  };
-
-  if (isLoading) {
+  if (error) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projects</h1>
-            <p className="text-gray-600 dark:text-gray-400">Loading projects...</p>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projetos</h1>
+          <Button onClick={() => setCreateDialogOpen(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Projeto
+          </Button>
         </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        
+        <Card>
+          <CardContent className="text-center py-12">
+            <div className="text-red-400 mb-4">
+              <Plus className="h-12 w-12 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              Erro ao carregar projetos
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              Não foi possível conectar com o servidor. Verifique sua conexão e tente novamente.
+            </p>
+            <Button onClick={() => window.location.reload()}>
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+
+        <CreateProjectDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projects</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage your sales projects and campaigns
-          </p>
-        </div>
-        <Button asChild>
-          <Link to="/projects/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Link>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projetos</h1>
+        <Button onClick={() => setCreateDialogOpen(true)} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Novo Projeto
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search projects..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          placeholder="Pesquisar projetos..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
       {/* Projects Grid */}
-      {filteredProjects.length > 0 ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredProjects.map((project) => (
-            <Card key={project.id} className="group hover:shadow-lg transition-shadow">
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
-                    <CardDescription className="mt-1">
-                      {project.description}
-                    </CardDescription>
-                  </div>
-                  <Badge 
-                    variant={project.status === 'active' ? 'default' : 'secondary'}
-                    className="ml-2"
-                  >
-                    {project.status}
-                  </Badge>
-                </div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Target Audience
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                      {project.targetAudience}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Objections ({project.objections.length})
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {project.objections.slice(0, 2).map((objection, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {objection.length > 20 ? `${objection.substring(0, 20)}...` : objection}
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : projectsData?.projects.length ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projectsData.projects.map((project) => (
+            <Card key={project.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg mb-2">{project.name}</CardTitle>
+                    <div className="flex flex-wrap gap-2">
+                      {project.companyName && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Building className="h-3 w-3 mr-1" />
+                          {project.companyName}
                         </Badge>
-                      ))}
-                      {project.objections.length > 2 && (
+                      )}
+                      {project.productServiceName && (
                         <Badge variant="outline" className="text-xs">
-                          +{project.objections.length - 2} more
+                          <Package className="h-3 w-3 mr-1" />
+                          {project.productServiceName}
+                        </Badge>
+                      )}
+                      {project.segment && (
+                        <Badge variant="default" className="text-xs">
+                          {project.segment}
                         </Badge>
                       )}
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Updated {new Date(project.updatedAt).toLocaleDateString()}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleProjectStatus(project.id, project.status)}
-                        title={`Mark as ${project.status === 'active' ? 'inactive' : 'active'}`}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/projects/${project.id}/edit`}>
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteProject(project.id, project.name)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="flex gap-1 ml-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setEditingProject(project)}
+                      className="h-8 w-8"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteProject(project.id)}
+                      className="h-8 w-8 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
+              </CardHeader>
+              <CardContent>
+                {project.description && (
+                  <p className="text-gray-600 dark:text-gray-300 text-sm mb-3 line-clamp-2">{project.description}</p>
+                )}
+                {project.valueProposition && (
+                  <p className="text-blue-600 dark:text-blue-400 text-sm mb-3 line-clamp-2 font-medium">
+                    💡 {project.valueProposition}
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Criado em {new Date(project.createdAt).toLocaleDateString('pt-BR')}
+                </p>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FolderOpen className="h-12 w-12 text-gray-400 mb-4" />
+          <CardContent className="text-center py-12">
+            <div className="text-gray-400 dark:text-gray-500 mb-4">
+              <Plus className="h-12 w-12 mx-auto" />
+            </div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No projects found
+              Nenhum projeto encontrado
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your search or filters'
-                : 'Get started by creating your first sales project'
-              }
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              {searchTerm ? "Tente ajustar sua pesquisa" : "Comece criando seu primeiro projeto"}
             </p>
-            {!searchTerm && statusFilter === 'all' && (
-              <Button asChild>
-                <Link to="/projects/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Project
-                </Link>
-              </Button>
-            )}
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              Criar Projeto
+            </Button>
           </CardContent>
         </Card>
+      )}
+
+      <CreateProjectDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
+
+      {editingProject && (
+        <EditProjectDialog
+          project={editingProject}
+          open={!!editingProject}
+          onOpenChange={(open) => !open && setEditingProject(null)}
+        />
       )}
     </div>
   );
 }
+
+export default Projects;

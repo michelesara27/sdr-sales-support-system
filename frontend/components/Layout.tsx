@@ -1,139 +1,108 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
   FolderOpen, 
   MessageSquare, 
-  MessageCircle,
-  Menu,
-  X,
-  Sun,
-  Moon
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useTheme } from '../contexts/ThemeContext';
+  Settings,
+  Menu
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Projects', href: '/projects', icon: FolderOpen },
-  { name: 'Conversation', href: '/conversation', icon: MessageCircle },
-  { name: 'Conversations', href: '/conversations', icon: MessageSquare },
+  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Projetos", href: "/projects", icon: FolderOpen },
+  { name: "Conversações", href: "/conversations", icon: MessageSquare },
+  { name: "Admin", href: "/admin", icon: Settings },
 ];
 
-export default function Layout({ children }: LayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { theme, toggleTheme } = useTheme();
+
+  const NavigationItems = () => (
+    <>
+      {navigation.map((item) => {
+        const isActive = location.pathname === item.href;
+        return (
+          <Link
+            key={item.name}
+            to={item.href}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              isActive
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800"
+            }`}
+          >
+            <item.icon className="h-5 w-5" />
+            {item.name}
+          </Link>
+        );
+      })}
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile sidebar */}
-      <div className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`}>
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white dark:bg-gray-800 shadow-xl">
-          <div className="flex h-16 items-center justify-between px-4">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">SDR Assistant</h1>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="h-5 w-5" />
-            </Button>
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-800 px-6 pb-4 border-r border-gray-200 dark:border-gray-700">
+          <div className="flex h-16 shrink-0 items-center justify-between">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">Ajudante SDR PRO</h1>
+            <ThemeToggle />
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <item.icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
-              );
-            })}
+          <nav className="flex flex-1 flex-col">
+            <ul role="list" className="flex flex-1 flex-col gap-y-2">
+              <li>
+                <div className="space-y-1">
+                  <NavigationItems />
+                </div>
+              </li>
+            </ul>
           </nav>
         </div>
       </div>
 
-      {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-          <div className="flex h-16 items-center px-4">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">SDR Assistant</h1>
+      {/* Mobile Header */}
+      <div className="lg:hidden">
+        <div className="flex items-center justify-between bg-white dark:bg-gray-800 px-4 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Ajudante SDR PRO</h1>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72">
+                <div className="flex h-16 shrink-0 items-center">
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">Ajudante SDR PRO</h1>
+                </div>
+                <nav className="flex flex-1 flex-col mt-6">
+                  <div className="space-y-1">
+                    <NavigationItems />
+                  </div>
+                </nav>
+              </SheetContent>
+            </Sheet>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                  }`}
-                >
-                  <item.icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="lg:pl-64">
-        {/* Top bar */}
-        <div className="sticky top-0 z-40 flex h-16 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:gap-x-6 sm:px-6 lg:px-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="lg:hidden"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-
-          <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-            <div className="flex flex-1" />
-            <div className="flex items-center gap-x-4 lg:gap-x-6">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-              >
-                {theme === 'light' ? (
-                  <Moon className="h-5 w-5" />
-                ) : (
-                  <Sun className="h-5 w-5" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Page content */}
-        <main className="py-6">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            {children}
-          </div>
+      {/* Main Content */}
+      <div className="lg:pl-72">
+        <main className="py-6 px-4 sm:px-6 lg:px-8">
+          {children}
         </main>
       </div>
     </div>
   );
 }
+
+export default Layout;

@@ -33,9 +33,9 @@ const BROWSER = typeof globalThis === "object" && ("window" in globalThis);
  * Client is an API client for the  Encore application.
  */
 export class Client {
-    public readonly analytics: analytics.ServiceClient
-    public readonly conversations: conversations.ServiceClient
-    public readonly projects: projects.ServiceClient
+    public readonly ai: ai.ServiceClient
+    public readonly conversation: conversation.ServiceClient
+    public readonly project: project.ServiceClient
     private readonly options: ClientOptions
     private readonly target: string
 
@@ -50,9 +50,9 @@ export class Client {
         this.target = target
         this.options = options ?? {}
         const base = new BaseClient(this.target, this.options)
-        this.analytics = new analytics.ServiceClient(base)
-        this.conversations = new conversations.ServiceClient(base)
-        this.projects = new projects.ServiceClient(base)
+        this.ai = new ai.ServiceClient(base)
+        this.conversation = new conversation.ServiceClient(base)
+        this.project = new project.ServiceClient(base)
     }
 
     /**
@@ -86,63 +86,36 @@ export interface ClientOptions {
 /**
  * Import the endpoint handlers to derive the types for the client.
  */
-import { getConversationDetails as api_analytics_conversation_details_getConversationDetails } from "~backend/analytics/conversation_details";
-import { getDashboard as api_analytics_dashboard_getDashboard } from "~backend/analytics/dashboard";
-import { getProjectSummary as api_analytics_project_summary_getProjectSummary } from "~backend/analytics/project_summary";
-import { getRecentActivity as api_analytics_recent_activity_getRecentActivity } from "~backend/analytics/recent_activity";
+import { generateResponse as api_ai_generate_response_generateResponse } from "~backend/ai/generate_response";
+import { generateSuggestion as api_ai_generate_suggestion_generateSuggestion } from "~backend/ai/generate_suggestion";
 
-export namespace analytics {
+export namespace ai {
 
     export class ServiceClient {
         private baseClient: BaseClient
 
         constructor(baseClient: BaseClient) {
             this.baseClient = baseClient
-            this.getConversationDetails = this.getConversationDetails.bind(this)
-            this.getDashboard = this.getDashboard.bind(this)
-            this.getProjectSummary = this.getProjectSummary.bind(this)
-            this.getRecentActivity = this.getRecentActivity.bind(this)
+            this.generateResponse = this.generateResponse.bind(this)
+            this.generateSuggestion = this.generateSuggestion.bind(this)
         }
 
         /**
-         * Retrieves conversation details with analytics.
+         * Generates an AI response using a mock implementation.
          */
-        public async getConversationDetails(): Promise<ResponseType<typeof api_analytics_conversation_details_getConversationDetails>> {
+        public async generateResponse(params: RequestType<typeof api_ai_generate_response_generateResponse>): Promise<ResponseType<typeof api_ai_generate_response_generateResponse>> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/analytics/conversations`, {method: "GET", body: undefined})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_analytics_conversation_details_getConversationDetails>
+            const resp = await this.baseClient.callTypedAPI(`/ai/generate`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ai_generate_response_generateResponse>
         }
 
         /**
-         * Retrieves dashboard statistics.
+         * Generates a suggestion for the next message in the conversation.
          */
-        public async getDashboard(): Promise<ResponseType<typeof api_analytics_dashboard_getDashboard>> {
+        public async generateSuggestion(params: RequestType<typeof api_ai_generate_suggestion_generateSuggestion>): Promise<ResponseType<typeof api_ai_generate_suggestion_generateSuggestion>> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/analytics/dashboard`, {method: "GET", body: undefined})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_analytics_dashboard_getDashboard>
-        }
-
-        /**
-         * Retrieves project summary with analytics.
-         */
-        public async getProjectSummary(): Promise<ResponseType<typeof api_analytics_project_summary_getProjectSummary>> {
-            // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/analytics/projects`, {method: "GET", body: undefined})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_analytics_project_summary_getProjectSummary>
-        }
-
-        /**
-         * Retrieves recent activity across the system.
-         */
-        public async getRecentActivity(params: RequestType<typeof api_analytics_recent_activity_getRecentActivity>): Promise<ResponseType<typeof api_analytics_recent_activity_getRecentActivity>> {
-            // Convert our params into the objects we need for the request
-            const query = makeRecord<string, string | string[]>({
-                limit: params.limit === undefined ? undefined : String(params.limit),
-            })
-
-            // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/analytics/recent-activity`, {query, method: "GET", body: undefined})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_analytics_recent_activity_getRecentActivity>
+            const resp = await this.baseClient.callTypedAPI(`/ai/suggest`, {method: "POST", body: JSON.stringify(params)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_ai_generate_suggestion_generateSuggestion>
         }
     }
 }
@@ -150,14 +123,13 @@ export namespace analytics {
 /**
  * Import the endpoint handlers to derive the types for the client.
  */
-import { addMessage as api_conversations_add_message_addMessage } from "~backend/conversations/add_message";
-import { create as api_conversations_create_create } from "~backend/conversations/create";
-import { deleteConversation as api_conversations_delete_deleteConversation } from "~backend/conversations/delete";
-import { get as api_conversations_get_get } from "~backend/conversations/get";
-import { list as api_conversations_list_list } from "~backend/conversations/list";
-import { update as api_conversations_update_update } from "~backend/conversations/update";
+import { addMessage as api_conversation_add_message_addMessage } from "~backend/conversation/add_message";
+import { create as api_conversation_create_create } from "~backend/conversation/create";
+import { getMessages as api_conversation_get_messages_getMessages } from "~backend/conversation/get_messages";
+import { getStats as api_conversation_get_stats_getStats } from "~backend/conversation/get_stats";
+import { list as api_conversation_list_list } from "~backend/conversation/list";
 
-export namespace conversations {
+export namespace conversation {
 
     export class ServiceClient {
         private baseClient: BaseClient
@@ -166,83 +138,60 @@ export namespace conversations {
             this.baseClient = baseClient
             this.addMessage = this.addMessage.bind(this)
             this.create = this.create.bind(this)
-            this.deleteConversation = this.deleteConversation.bind(this)
-            this.get = this.get.bind(this)
+            this.getMessages = this.getMessages.bind(this)
+            this.getStats = this.getStats.bind(this)
             this.list = this.list.bind(this)
-            this.update = this.update.bind(this)
         }
 
         /**
          * Adds a message to an existing conversation.
          */
-        public async addMessage(params: RequestType<typeof api_conversations_add_message_addMessage>): Promise<ResponseType<typeof api_conversations_add_message_addMessage>> {
+        public async addMessage(params: RequestType<typeof api_conversation_add_message_addMessage>): Promise<ResponseType<typeof api_conversation_add_message_addMessage>> {
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
                 content: params.content,
-                type:    params.type,
+                role:    params.role,
             }
 
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.id)}/messages`, {method: "POST", body: JSON.stringify(body)})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_add_message_addMessage>
+            const resp = await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.conversationId)}/messages`, {method: "POST", body: JSON.stringify(body)})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversation_add_message_addMessage>
         }
 
         /**
-         * Creates a new conversation.
+         * Creates a new conversation and returns the initial AI response.
          */
-        public async create(params: RequestType<typeof api_conversations_create_create>): Promise<ResponseType<typeof api_conversations_create_create>> {
+        public async create(params: RequestType<typeof api_conversation_create_create>): Promise<ResponseType<typeof api_conversation_create_create>> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/conversations`, {method: "POST", body: JSON.stringify(params)})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_create_create>
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversation_create_create>
         }
 
         /**
-         * Deletes a conversation and all its messages.
+         * Retrieves all messages for a conversation.
          */
-        public async deleteConversation(params: { id: number }): Promise<void> {
-            await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.id)}`, {method: "DELETE", body: undefined})
-        }
-
-        /**
-         * Retrieves a specific conversation by ID.
-         */
-        public async get(params: { id: number }): Promise<ResponseType<typeof api_conversations_get_get>> {
+        public async getMessages(params: { conversationId: number }): Promise<ResponseType<typeof api_conversation_get_messages_getMessages>> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.id)}`, {method: "GET", body: undefined})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_get_get>
+            const resp = await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.conversationId)}/messages`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversation_get_messages_getMessages>
         }
 
         /**
-         * Retrieves all conversations with optional filtering.
+         * Retrieves conversation statistics for the dashboard.
          */
-        public async list(params: RequestType<typeof api_conversations_list_list>): Promise<ResponseType<typeof api_conversations_list_list>> {
-            // Convert our params into the objects we need for the request
-            const query = makeRecord<string, string | string[]>({
-                projectId: params.projectId === undefined ? undefined : String(params.projectId),
-                status:    params.status === undefined ? undefined : String(params.status),
-            })
-
+        public async getStats(): Promise<ResponseType<typeof api_conversation_get_stats_getStats>> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/conversations`, {query, method: "GET", body: undefined})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_list_list>
+            const resp = await this.baseClient.callTypedAPI(`/conversations/stats`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversation_get_stats_getStats>
         }
 
         /**
-         * Updates an existing conversation.
+         * Retrieves all conversations, ordered by creation date.
          */
-        public async update(params: RequestType<typeof api_conversations_update_update>): Promise<ResponseType<typeof api_conversations_update_update>> {
-            // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
-            const body: Record<string, any> = {
-                leadCompany: params.leadCompany,
-                leadName:    params.leadName,
-                leadNotes:   params.leadNotes,
-                leadSource:  params.leadSource,
-                status:      params.status,
-            }
-
+        public async list(): Promise<ResponseType<typeof api_conversation_list_list>> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/conversations/${encodeURIComponent(params.id)}`, {method: "PUT", body: JSON.stringify(body)})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversations_update_update>
+            const resp = await this.baseClient.callTypedAPI(`/conversations`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_conversation_list_list>
         }
     }
 }
@@ -250,13 +199,14 @@ export namespace conversations {
 /**
  * Import the endpoint handlers to derive the types for the client.
  */
-import { create as api_projects_create_create } from "~backend/projects/create";
-import { deleteProject as api_projects_delete_deleteProject } from "~backend/projects/delete";
-import { get as api_projects_get_get } from "~backend/projects/get";
-import { list as api_projects_list_list } from "~backend/projects/list";
-import { update as api_projects_update_update } from "~backend/projects/update";
+import { create as api_project_create_create } from "~backend/project/create";
+import { deleteProject as api_project_delete_deleteProject } from "~backend/project/delete";
+import { getById as api_project_get_by_id_getById } from "~backend/project/get_by_id";
+import { getStats as api_project_get_stats_getStats } from "~backend/project/get_stats";
+import { list as api_project_list_list } from "~backend/project/list";
+import { update as api_project_update_update } from "~backend/project/update";
 
-export namespace projects {
+export namespace project {
 
     export class ServiceClient {
         private baseClient: BaseClient
@@ -265,7 +215,8 @@ export namespace projects {
             this.baseClient = baseClient
             this.create = this.create.bind(this)
             this.deleteProject = this.deleteProject.bind(this)
-            this.get = this.get.bind(this)
+            this.getById = this.getById.bind(this)
+            this.getStats = this.getStats.bind(this)
             this.list = this.list.bind(this)
             this.update = this.update.bind(this)
         }
@@ -273,56 +224,74 @@ export namespace projects {
         /**
          * Creates a new project.
          */
-        public async create(params: RequestType<typeof api_projects_create_create>): Promise<ResponseType<typeof api_projects_create_create>> {
+        public async create(params: RequestType<typeof api_project_create_create>): Promise<ResponseType<typeof api_project_create_create>> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/projects`, {method: "POST", body: JSON.stringify(params)})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_projects_create_create>
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_project_create_create>
         }
 
         /**
-         * Deletes a project and all its related data.
+         * Deletes a project.
          */
         public async deleteProject(params: { id: number }): Promise<void> {
             await this.baseClient.callTypedAPI(`/projects/${encodeURIComponent(params.id)}`, {method: "DELETE", body: undefined})
         }
 
         /**
-         * Retrieves a specific project by ID.
+         * Retrieves a project by ID.
          */
-        public async get(params: { id: number }): Promise<ResponseType<typeof api_projects_get_get>> {
+        public async getById(params: { id: number }): Promise<ResponseType<typeof api_project_get_by_id_getById>> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/projects/${encodeURIComponent(params.id)}`, {method: "GET", body: undefined})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_projects_get_get>
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_project_get_by_id_getById>
         }
 
         /**
-         * Retrieves all projects with their objections.
+         * Retrieves project statistics for the dashboard.
          */
-        public async list(): Promise<ResponseType<typeof api_projects_list_list>> {
+        public async getStats(): Promise<ResponseType<typeof api_project_get_stats_getStats>> {
             // Now make the actual call to the API
-            const resp = await this.baseClient.callTypedAPI(`/projects`, {method: "GET", body: undefined})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_projects_list_list>
+            const resp = await this.baseClient.callTypedAPI(`/projects/stats`, {method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_project_get_stats_getStats>
+        }
+
+        /**
+         * Retrieves all projects, optionally filtered by search term.
+         */
+        public async list(params: RequestType<typeof api_project_list_list>): Promise<ResponseType<typeof api_project_list_list>> {
+            // Convert our params into the objects we need for the request
+            const query = makeRecord<string, string | string[]>({
+                limit:  params.limit === undefined ? undefined : String(params.limit),
+                search: params.search,
+            })
+
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI(`/projects`, {query, method: "GET", body: undefined})
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_project_list_list>
         }
 
         /**
          * Updates an existing project.
          */
-        public async update(params: RequestType<typeof api_projects_update_update>): Promise<ResponseType<typeof api_projects_update_update>> {
+        public async update(params: RequestType<typeof api_project_update_update>): Promise<ResponseType<typeof api_project_update_update>> {
             // Construct the body with only the fields which we want encoded within the body (excluding query string or header fields)
             const body: Record<string, any> = {
-                approachGuide:  params.approachGuide,
-                description:    params.description,
-                name:           params.name,
-                objections:     params.objections,
-                productDetails: params.productDetails,
-                status:         params.status,
-                targetAudience: params.targetAudience,
-                valueArguments: params.valueArguments,
+                companyName:               params.companyName,
+                competitiveAdvantages:     params.competitiveAdvantages,
+                description:               params.description,
+                expectedObjections:        params.expectedObjections,
+                idealClientProfile:        params.idealClientProfile,
+                name:                      params.name,
+                problemSolved:             params.problemSolved,
+                productServiceDescription: params.productServiceDescription,
+                productServiceName:        params.productServiceName,
+                segment:                   params.segment,
+                valueProposition:          params.valueProposition,
             }
 
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI(`/projects/${encodeURIComponent(params.id)}`, {method: "PUT", body: JSON.stringify(body)})
-            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_projects_update_update>
+            return JSON.parse(await resp.text(), dateReviver) as ResponseType<typeof api_project_update_update>
         }
     }
 }

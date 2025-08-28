@@ -1,221 +1,152 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  FolderOpen, 
-  MessageCircle, 
-  TrendingUp, 
-  Users,
-  Plus,
-  ArrowRight
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useQuery } from '@tanstack/react-query';
-import { useBackend } from '../hooks/useBackend';
-import { useProjects } from '../contexts/ProjectContext';
-import { useConversations } from '../contexts/ConversationContext';
+import { useQuery } from "@tanstack/react-query";
+import { Plus, FolderOpen, MessageSquare, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import backend from "~backend/client";
 
-export default function Dashboard() {
-  const backend = useBackend();
-  const { projects } = useProjects();
-  const { conversations } = useConversations();
-
-  const { data: dashboardData } = useQuery({
-    queryKey: ['dashboard'],
+function Dashboard() {
+  const { data: projectStats } = useQuery({
+    queryKey: ["project-stats"],
     queryFn: async () => {
       try {
-        return await backend.analytics.getDashboard();
+        return await backend.project.getStats();
       } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-        throw error;
+        console.error("Error fetching project stats:", error);
+        return { totalProjects: 0, recentProjects: 0 };
       }
     },
+    retry: 3,
+    retryDelay: 1000,
   });
 
-  const stats = dashboardData?.stats || {
-    totalProjects: 0,
-    activeProjects: 0,
-    totalConversations: 0,
-    openConversations: 0,
-    closedConversations: 0,
-    avgMessagesPerConversation: 0,
-    totalMessages: 0,
-    totalUserMessages: 0,
-    totalAiMessages: 0,
-  };
+  const { data: conversationStats } = useQuery({
+    queryKey: ["conversation-stats"],
+    queryFn: async () => {
+      try {
+        return await backend.conversation.getStats();
+      } catch (error) {
+        console.error("Error fetching conversation stats:", error);
+        return { openConversations: 0 };
+      }
+    },
+    retry: 3,
+    retryDelay: 1000,
+  });
 
-  const recentProjects = projects.slice(0, 3);
-  const recentConversations = conversations.slice(0, 3);
+  const { data: recentProjects } = useQuery({
+    queryKey: ["recent-projects"],
+    queryFn: async () => {
+      try {
+        return await backend.project.list({ limit: 5 });
+      } catch (error) {
+        console.error("Error fetching recent projects:", error);
+        return { projects: [] };
+      }
+    },
+    retry: 3,
+    retryDelay: 1000,
+  });
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Welcome to your SDR sales support system
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Button asChild>
-            <Link to="/projects/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Project
-            </Link>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <Link to="/projects">
+          <Button className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Projeto
           </Button>
-          <Button variant="outline" asChild>
-            <Link to="/conversation">
-              <MessageCircle className="mr-2 h-4 w-4" />
-              Start Conversation
-            </Link>
-          </Button>
-        </div>
+        </Link>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+            <CardTitle className="text-sm font-medium">Projetos Ativos</CardTitle>
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeProjects}</div>
+            <div className="text-2xl font-bold">{projectStats?.totalProjects || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.totalProjects} total projects
+              Total de projetos no sistema
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Open Conversations</CardTitle>
-            <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Conversações Abertas</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.openConversations}</div>
+            <div className="text-2xl font-bold">{conversationStats?.openConversations || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.totalConversations} total conversations
+              Conversas em andamento
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Messages</CardTitle>
+            <CardTitle className="text-sm font-medium">Projetos Recentes</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Math.round(stats.avgMessagesPerConversation)}</div>
+            <div className="text-2xl font-bold">{projectStats?.recentProjects || 0}</div>
             <p className="text-xs text-muted-foreground">
-              per conversation
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Messages</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalMessages}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.totalUserMessages} user, {stats.totalAiMessages} AI
+              Criados nos últimos 7 dias
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Projects */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recent Projects</CardTitle>
-              <CardDescription>Your latest sales projects</CardDescription>
+      {/* Recent Projects */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Projetos Recentes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentProjects?.projects.length ? (
+            <div className="space-y-3">
+              {recentProjects.projects.map((project) => (
+                <div
+                  key={project.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                >
+                  <div>
+                    <h3 className="font-medium text-gray-900 dark:text-white">{project.name}</h3>
+                    {project.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-300">{project.description}</p>
+                    )}
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Criado em {new Date(project.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
+                  <Link to="/projects">
+                    <Button variant="outline" size="sm">
+                      Ver Detalhes
+                    </Button>
+                  </Link>
+                </div>
+              ))}
             </div>
-            <Button variant="ghost" size="sm" asChild>
+          ) : (
+            <div className="text-center py-6">
+              <FolderOpen className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-600 dark:text-gray-300">Nenhum projeto encontrado</p>
               <Link to="/projects">
-                View all
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <Button className="mt-4">
+                  Criar Primeiro Projeto
+                </Button>
               </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentProjects.length > 0 ? (
-              recentProjects.map((project) => (
-                <div key={project.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {project.name}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {project.description}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      project.status === 'active'
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-                    }`}>
-                      {project.status}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400">No projects yet</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Conversations */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recent Conversations</CardTitle>
-              <CardDescription>Latest lead interactions</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/conversations">
-                View all
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentConversations.length > 0 ? (
-              recentConversations.map((conversation) => (
-                <div key={conversation.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {conversation.leadName}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {conversation.leadCompany}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      conversation.status === 'open'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-                    }`}>
-                      {conversation.status}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400">No conversations yet</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
+
+export default Dashboard;
